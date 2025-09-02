@@ -22,6 +22,10 @@ TcpClient::TcpClient(QWidget *parent)
     // 尝试连接到服务器，使用配置文件中加载的IP和端口
     m_tcpSocket.connectToHost(QHostAddress(m_strIP),m_usPort);
 }
+void TcpClient::setCurPath(QString setCurPath)
+{
+    m_strCurPath = setCurPath;
+}
 
 // 析构函数，用于释放 UI 对象
 TcpClient::~TcpClient()
