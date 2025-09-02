@@ -56,6 +56,8 @@ Book::Book(QWidget *parent)
 
     // 将重命名按钮的 clicked 信号连接到 reName 槽函数
     connect(m_pRenamePB, &QPushButton::clicked, this, &Book::reName);
+    // 将文件列表的双击信号连接到 entryDir 槽函数
+    connect(m_pBookListw, &QListWidget::doubleClicked, this, &Book::entryDir);
 }
 
 // 刷新文件列表的槽函数，根据服务器返回的数据（pdu）更新显示
@@ -191,4 +193,39 @@ void Book::reName()
     }else{
         QMessageBox::warning(this,"重命名","文件夹名称不能为空");
     }
+}
+// 进入文件夹的槽函数
+void Book::entryDir(const QModelIndex &index)
+{
+    // 获取被双击的 QListWidgetItem
+    QListWidgetItem *item = m_pBookListw->item(index.row());
+    // 如果获取失败，直接返回
+    if (!item) return;
+    // 从项目数据中取出之前存储的类型信息（Qt::UserRole 是一个自定义角色）
+    int itemType = item->data(Qt::UserRole).toInt();
+    // 如果类型不为0（0代表文件夹），则表示双击的不是文件夹，直接返回，不发送请求
+    if (itemType != 0) { // 0 代表文件夹
+        return;
+    }
+    // 获取被双击的文件夹名称
+    QString strDirName = item->text();
+    // 将要进入的文件夹名称存储到客户端实例中
+    TcpClient::getInstance().setEnterDirName(strDirName);
+    // 获取当前客户端的路径
+    QString strCurPath = TcpClient::getInstance().curPath();
+    // 创建一个PDU，用于封装“进入文件夹”请求
+    PDU *pdu = mkPDU(strCurPath.size()+1);
+    // 设置消息类型为“进入文件夹请求”
+    pdu->uiMsgType = ENUM_MSG_TYPE_ENTRY_DIR_REQUEST;
+    // 将要进入的文件夹名称拷贝到PDU的caData字段中，最多32字节
+    strncpy(pdu->caData,strDirName.toStdString().c_str(),32);
+    // 确保字符串以空字符结尾
+    pdu->caData[31] = '\0';
+    // 将当前路径拷贝到PDU的caMsg字段中
+    strncpy(pdu->caMsg,strCurPath.toStdString().c_str(),strCurPath.size());
+    // 通过TCP socket发送PDU数据
+    TcpClient::getInstance().getTcpSocket().write((char*)pdu,pdu->uiPDULen);
+    // 释放动态分配的PDU内存
+    free(pdu);
+    pdu = NULL;
 }

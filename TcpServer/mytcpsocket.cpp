@@ -395,6 +395,7 @@ void MyTcpSocket::recvMsg()
 
         // 2. 根据有效文件数量创建响应PDU
         PDU *respdu = mkPDU(iFileCount * sizeof(FileInfo));
+        strcpy(respdu->caData,"success");
         respdu->uiMsgType = ENUM_MSG_TYPE_FLUSH_FILE_RESPOND;
         // 指向PDU消息内容的起始位置
         FileInfo *pFileInfo = (FileInfo*)(respdu->caMsg);
@@ -493,6 +494,84 @@ void MyTcpSocket::recvMsg()
         write((char*)respdu,respdu->uiPDULen);
         free(respdu);
         respdu = NULL;
+        delete[] pPath;
+        pPath = NULL;
+        break;
+    }
+    // 处理进入文件夹请求
+    case ENUM_MSG_TYPE_ENTRY_DIR_REQUEST: {
+        // 从PDU的caData字段中获取要进入的文件夹名称
+        char caEnterName[32] = {'\0'};
+        strncpy(caEnterName, pdu->caData, 32);
+        // 从PDU的caMsg字段中获取当前路径，并动态分配内存
+        char *pPath = new char[pdu->uiMsgLen];
+        strncpy(pPath, pdu->caMsg, pdu->uiMsgLen);
+        pPath[pdu->uiMsgLen - 1] = '\0';
+        // 拼接要进入的完整路径
+        QString strEnterPath = QString("%1/%2").arg(pPath).arg(caEnterName);
+        QFileInfo fileInfo(strEnterPath);
+        PDU *respdu = NULL;
+        // 如果是文件夹
+        if (fileInfo.isDir()) {
+            QDir dir(strEnterPath);
+            // 获取文件夹下的所有文件和子文件夹信息
+            QFileInfoList fileInfoList = dir.entryInfoList();
+            int iFileCount = 0;
+            // 遍历列表，统计有效文件/文件夹数量（排除"."和".."）
+            for (int i = 0; i < fileInfoList.size(); ++i) {
+                if (fileInfoList.at(i).fileName() == "." || fileInfoList.at(i).fileName() == "..") {
+                    continue;
+                }
+                iFileCount++;
+            }
+            // 根据有效文件数量创建响应PDU
+            respdu = mkPDU(iFileCount * sizeof(FileInfo));
+            strcpy(respdu->caData,"success");
+            // 设置响应消息类型为“刷新文件列表响应”
+            respdu->uiMsgType = ENUM_MSG_TYPE_FLUSH_FILE_RESPOND;
+            FileInfo *pFileInfo = (FileInfo*)(respdu->caMsg);
+            int currentIndex = 0;
+            strcpy(respdu->caData,"success");
+            // 再次遍历列表，填充PDU中的文件信息
+            for (int i = 0; i < fileInfoList.size(); ++i) {
+                if (fileInfoList.at(i).fileName() == "." || fileInfoList.at(i).fileName() == "..") {
+                    continue;
+                }
+                // 获取当前文件/文件夹的FileInfo结构体指针
+                pFileInfo = (FileInfo*)(respdu->caMsg + currentIndex * sizeof(FileInfo));
+                QString strFileName = fileInfoList.at(i).fileName();
+                // 拷贝文件名，并确保空终止
+                strncpy(pFileInfo->caFileName, strFileName.toStdString().c_str(), 31);
+                pFileInfo->caFileName[31] = '\0';
+                // 设置文件类型（0为文件夹，1为文件）
+                if (fileInfoList[i].isDir()) {
+                    pFileInfo->iFileType = 0;
+                } else if (fileInfoList[i].isFile()) {
+                    pFileInfo->iFileType = 1;
+                }
+                currentIndex++;
+            }
+            // 发送响应PDU
+            write((char*)respdu, respdu->uiPDULen);
+            // 释放内存
+            free(respdu);
+            respdu = NULL;
+        } else if (fileInfo.isFile()) { // 如果是文件，则不能进入
+            respdu = mkPDU(0);
+            respdu->uiMsgType = ENUM_MSG_TYPE_ENTRY_DIR_RESPOND;
+            strcpy(respdu->caData, "进入文件夹失败，不是文件夹");
+            write((char*)respdu, respdu->uiPDULen);
+            free(respdu);
+            respdu = NULL;
+        } else { // 如果路径不存在
+            respdu = mkPDU(0);
+            respdu->uiMsgType = ENUM_MSG_TYPE_ENTRY_DIR_RESPOND;
+            strcpy(respdu->caData, "进入文件夹失败，文件夹不存在");
+            write((char*)respdu, respdu->uiPDULen);
+            free(respdu);
+            respdu = NULL;
+        }
+        // 释放动态分配的路径内存
         delete[] pPath;
         pPath = NULL;
         break;
