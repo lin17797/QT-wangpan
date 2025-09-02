@@ -9,6 +9,8 @@ MyTcpSocket::MyTcpSocket()
     connect(this,SIGNAL(readyRead()),this,SLOT(recvMsg()));
     // 连接信号和槽：当客户端断开连接时，触发 clientOffline() 槽函数
     connect(this,SIGNAL(disconnected()),this,SLOT(clientOffline()));
+
+    m_bUpload = false;
 }
 
 // 获取当前客户端的用户名
@@ -20,6 +22,7 @@ QString MyTcpSocket::getName()
 // 槽函数：处理接收到的数据
 void MyTcpSocket::recvMsg()
 {
+    if(!m_bUpload){
     qDebug() << this ->bytesAvailable(); // 调试输出当前 socket 可读的字节数
 
     uint uiPDULen = 0;
@@ -579,11 +582,77 @@ void MyTcpSocket::recvMsg()
         pPath = NULL;
         break;
     }
+    case ENUM_MSG_TYPE_UPLOAD_FILE_REQUEST:{
+        char caFileName[32] = {'\0'};
+        qint64 fileSize = 0;
+        sscanf(pdu->caData,"%[^#]#%lld",caFileName,&fileSize);
+        char *pPath = new char[pdu->uiMsgLen];
+        strncpy(pPath,pdu->caMsg,pdu->uiMsgLen);
+        pPath[pdu->uiMsgLen-1] = '\0';
+        QString strPath = QString("%1/%2").arg(pPath).arg(caFileName);
+        qDebug() << strPath << fileSize;
+        delete[] pPath;
+        pPath = NULL;
+
+        m_file.setFileName(strPath);
+        // 只读模式打开文件
+        if(m_file.open(QIODevice::WriteOnly)){
+            m_bUpload = true;
+            m_iTotal = fileSize;
+            m_iRecved = 0;
+
+            PDU *respdu = mkPDU(0);
+            respdu->uiMsgType = ENUM_MSG_TYPE_UPLOAD_FILE_READY_RESPOND; // <-- 使用新消息类型
+            write((char*)respdu, respdu->uiPDULen);
+            free(respdu);
+            respdu = NULL;
+        }else{
+            // 文件打开失败，通知客户端上传失败
+            PDU *respdu = mkPDU(0);
+            respdu->uiMsgType = ENUM_MSG_TYPE_UPLOAD_FILE_RESPOND; //可以直接复用最终响应
+            strcpy(respdu->caData, "服务器创建文件失败，请检查路径或权限");
+            write((char*)respdu, respdu->uiPDULen);
+            free(respdu);
+            respdu = NULL;
+        }
+        break;
+    }
     default:
         break;
     }
     free(pdu); // 释放 PDU 内存
     pdu = NULL;
+    }
+    else{
+        QByteArray buff = readAll();
+        m_file.write(buff);
+        m_iRecved += buff.size();
+
+        if(m_iRecved == m_iTotal){
+            m_file.close();
+            m_bUpload = false;
+            PDU *respdu = mkPDU(0);
+            respdu->uiMsgType = ENUM_MSG_TYPE_UPLOAD_FILE_RESPOND;
+            strcpy(respdu->caData,"文件上传成功");
+
+            write((char*)respdu, respdu->uiPDULen);
+            free(respdu);
+            respdu = NULL;
+        }else if(m_iRecved > m_iTotal){
+            // 如果接收到的数据超出预期，也视为失败
+            m_file.close();
+            m_bUpload = false; // 恢复状态
+
+            PDU *respdu = mkPDU(0);
+            respdu->uiMsgType = ENUM_MSG_TYPE_UPLOAD_FILE_RESPOND;
+            strcpy(respdu->caData, "文件上传失败：传输数据异常");
+
+            // 只在创建了 respdu 后才发送和释放
+            write((char*)respdu, respdu->uiPDULen);
+            free(respdu);
+            respdu = NULL;
+        }
+    }
 }
 
 // 槽函数：客户端下线处理
