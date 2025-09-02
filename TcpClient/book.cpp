@@ -51,6 +51,11 @@ Book::Book(QWidget *parent)
 
     // 将刷新文件按钮的 clicked 信号连接到 flushFileSlot 槽函数
     connect(m_pFlushFilePB, &QPushButton::clicked, this, &Book::flushFileSlot);
+    // 将删除文件夹按钮的 clicked 信号连接到 delDir 槽函数
+    connect(m_pDelDirPB, &QPushButton::clicked, this, &Book::delDir);
+
+    // 将重命名按钮的 clicked 信号连接到 reName 槽函数
+    connect(m_pRenamePB, &QPushButton::clicked, this, &Book::reName);
 }
 
 // 刷新文件列表的槽函数，根据服务器返回的数据（pdu）更新显示
@@ -139,4 +144,51 @@ void Book::flushFileSlot()
     // 释放 PDU 内存
     free(pdu);
     pdu = NULL;
+}
+void Book::delDir()
+{
+    QString strCurPath = TcpClient::getInstance().curPath();
+    QListWidgetItem *pItem =  m_pBookListw->currentItem();
+    if(pItem == NULL){
+        QMessageBox::warning(this,"删除文件夹","请选择要删除的文件夹");
+        return;
+    }
+    QString strDelName = pItem->text();
+    PDU *pdu = mkPDU(strCurPath.size()+1);
+    pdu->uiMsgType = ENUM_MSG_TYPE_DEL_DIR_REQUEST;
+    strncpy(pdu->caData,strDelName.toStdString().c_str(),32);
+    pdu->caData[31] = '\0';
+    strncpy(pdu->caMsg,strCurPath.toStdString().c_str(),strCurPath.size());
+    TcpClient::getInstance().getTcpSocket().write((char*)pdu,pdu->uiPDULen);
+    free(pdu);
+    pdu = NULL;
+}
+void Book::reName()
+{
+    QString strCurPath = TcpClient::getInstance().curPath();
+    QListWidgetItem *pItem =  m_pBookListw->currentItem();
+    if(pItem == NULL){
+        QMessageBox::warning(this,"重命名","请选择要重命名的文件");
+        return;
+    }
+    QString strOldName = pItem->text();
+    QString strNewName = QInputDialog::getText(this, "重命名", "请输入新的文件名称:");
+    if(!strNewName.isEmpty()){
+        if(strNewName.size()>32){
+            QMessageBox::warning(this,"重命名","文件名称过长，不能超过32个字符");
+        }else{
+            PDU *pdu = mkPDU(strCurPath.size()+1);
+            pdu->uiMsgType = ENUM_MSG_TYPE_RENAME_DIR_REQUEST;
+            strncpy(pdu->caData,strOldName.toStdString().c_str(),32);
+            pdu->caData[31] = '\0';
+            strncpy(pdu->caData+32,strNewName.toStdString().c_str(),32);
+            pdu->caData[63] = '\0';
+            strncpy(pdu->caMsg,strCurPath.toStdString().c_str(),strCurPath.size());
+            TcpClient::getInstance().getTcpSocket().write((char*)pdu,pdu->uiPDULen);
+            free(pdu);
+            pdu = NULL;
+        }
+    }else{
+        QMessageBox::warning(this,"重命名","文件夹名称不能为空");
+    }
 }

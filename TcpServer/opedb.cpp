@@ -14,7 +14,7 @@ OpeDB &OpeDB::getInstance()
 
 void OpeDB::init()
 {
-    m_db.setDatabaseName("/home/hansu/wangpan/TcpServer/cloud.db");
+    m_db.setDatabaseName("/home/hansu/QT-wangpan/TcpServer/cloud.db");
     if(m_db.open()){
         QSqlQuery query;
         query.exec("select * from usrInfo");
