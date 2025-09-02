@@ -436,34 +436,37 @@ void MyTcpSocket::recvMsg()
         break;
     }
     // 处理删除文件夹请求
-    case ENUM_MSG_TYPE_DEL_DIR_REQUEST:{
+    case ENUM_MSG_TYPE_DEL_ITEM_REQUEST:{
         char caName[32] = {'\0'};
-        strcpy(caName,pdu->caData);
+        strncpy(caName, pdu->caData, 32); // 获取用户名
         char *pPath = new char[pdu->uiMsgLen];
-        strncpy(pPath,pdu->caMsg,pdu->uiMsgLen);
+        strncpy(pPath, pdu->caMsg, pdu->uiMsgLen);
         pPath[pdu->uiMsgLen-1] = '\0';
         QString strPath = QString("%1/%2").arg(pPath).arg(caName);
+
         QFileInfo fileInfo(strPath);
         bool ret = false;
         if(fileInfo.isDir()){
-            QDir dir;
-            dir.setPath(strPath);
-            ret = dir.removeRecursively();
+            ret = QDir(strPath).removeRecursively();
         }else if(fileInfo.isFile()){
-            ret = false;
+            ret = QFile::remove(strPath);
         }
         PDU *respdu = NULL;
         if(ret){
             respdu = mkPDU(0);
-            respdu->uiMsgType = ENUM_MSG_TYPE_DEL_DIR_RESPOND;
-            strcpy(respdu->caData,"删除文件夹成功");
-
+            respdu->uiMsgType = ENUM_MSG_TYPE_DEL_ITEM_RESPOND;
+            strcpy(respdu->caData,"删除成功");
         }else{
             respdu = mkPDU(0);
-            respdu->uiMsgType = ENUM_MSG_TYPE_DEL_DIR_RESPOND;
-            strcpy(respdu->caData,"删除文件夹失败");
+            respdu->uiMsgType = ENUM_MSG_TYPE_DEL_ITEM_RESPOND;
+            // 提供失败原因
+            if (!fileInfo.exists()) {
+                strcpy(respdu->caData, "删除失败：项目不存在");
+            } else {
+                strcpy(respdu->caData, "删除失败：权限不足或未知错误");
+            }
         }
-        write((char*)respdu,respdu->uiPDULen);
+        write((char*)respdu, respdu->uiPDULen);
         free(respdu);
         respdu = NULL;
         delete[] pPath;
