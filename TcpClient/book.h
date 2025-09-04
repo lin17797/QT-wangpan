@@ -21,6 +21,12 @@ public:
     void uploadFile();
 
     void uploadFileData();
+    void downloadFile();
+    void setDownloadStatus(bool status);
+    bool getDownloadStatus();
+    QString getSaveFilePath();
+    qint64 m_iTotal;
+    qint64 m_iRecved;
 
 
 signals:
@@ -40,7 +46,9 @@ private:
     QPushButton *m_pShareFilePB;
 
     QString m_strUploadFilePath;
+    QString m_strSaveFilePath;
     QTimer m_pTimer;
+    bool m_bDownload;
 
 };
 
