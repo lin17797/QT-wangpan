@@ -25,6 +25,8 @@ public:
     void setDownloadStatus(bool status);
     bool getDownloadStatus();
     void shareFile();
+    void moveFile();
+    void selectDir();
     QString getSaveFilePath();
     qint64 m_iTotal;
     qint64 m_iRecved;
@@ -47,6 +49,8 @@ private:
     QPushButton *m_pUploadPB;
     QPushButton *m_pDownLoadPB;
     QPushButton *m_pShareFilePB;
+    QPushButton *m_pMoveFilePB;
+    QPushButton *m_pSelectDirPB;
 
     QString m_strUploadFilePath;
     QString m_strSaveFilePath;
@@ -54,6 +58,9 @@ private:
     bool m_bDownload;
     bool m_bInSharingProcess; // 标志是否处于分享文件过程
     QString m_strShareFileName; // 用于存储要分享的文件名
+    QString m_strMoveFileName; // 用于存储要移动的文件名
+    QString m_strMoveFilePath; // 用于存储要移动的文件的当前路径
+    QString m_strDestDirPath; // 用于存储目标目录路径
 
 };
 
