@@ -15,9 +15,11 @@ public:
     explicit Friend(QWidget *parent = nullptr);
     void showAllOnlineUsr(PDU *pdu);
     void showAllFriend(PDU *pdu);
+    QListWidget* getFriendList();
 
     QString m_strSearchName;
 signals:
+    void friendListUpdated(); // 当好友列表更新时发出此信号
 
 public slots:
     void showOnline();

@@ -29,6 +29,7 @@ OpeWidget::OpeWidget(QWidget *parent)
     setLayout(pMainHBL);
 
     connect(m_pListW,SIGNAL(currentRowChanged(int)),m_pSW,SLOT(setCurrentIndex(int)));
+    connect(m_pFriend, &Friend::friendListUpdated, m_pBook, &Book::handleFriendListUpdated);
 
 }
 
