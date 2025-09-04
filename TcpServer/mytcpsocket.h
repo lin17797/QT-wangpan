@@ -12,6 +12,7 @@ class MyTcpSocket : public QTcpSocket
 public:
     MyTcpSocket();
     QString getName();
+    void copyDir(QString srcDir, QString destDir);
 signals:
     void offline(MyTcpSocket *mysocket);
 public slots:
